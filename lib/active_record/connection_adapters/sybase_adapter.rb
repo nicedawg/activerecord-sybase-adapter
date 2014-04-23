@@ -42,6 +42,12 @@ module ActiveRecord
     #       is no support for them: you'll get a crash if you enable this feature
     #
     class SybaseAdapter < AbstractAdapter # :nodoc:
+
+      def quote_table_name(name)
+        schema = self.current_database
+        "#{quote_column_name(schema)}.#{quote_column_name(name)}"
+      end
+
       class SybaseColumn < Column
         attr_reader :identity
 
