@@ -286,16 +286,18 @@ module ActiveRecord
 
       def columns(table_name, name = nil)
         sql = <<-sql
-          SELECT col.name AS name, type.name AS type, col.prec, col.scale,
-                 col.length, col.status, obj.sysstat2, def.text
-          FROM sysobjects obj, syscolumns col, systypes type, syscomments def
-          WHERE obj.id = col.id              AND
-                col.usertype = type.usertype AND
-                type.name != 'timestamp'     AND
-                col.cdefault *= def.id       AND
-                obj.type IN (#@table_types)  AND
-                obj.name = '#{table_name}'
-          ORDER BY col.colid
+          SELECT
+            col.cname AS name,
+            col.coltype AS type,
+            0 as prec,
+            0 as scale,
+            col.length as length,
+            1 as status,
+            1 as sysstat2,
+            remarks as def
+          FROM sys.syscolumns col
+          WHERE col.tname = '#{table_name}'
+          ORDER BY col.colno
         sql
 
         result = select sql, "Columns for #{table_name}"
@@ -325,12 +327,10 @@ module ActiveRecord
 
       def primary_key(table)
         sql = <<-sql
-          SELECT index_col(usr.name || "." || obj.name, idx.indid, 1)
-          FROM sysobjects obj
-          INNER JOIN sysusers usr on obj.uid = usr.uid
-          INNER JOIN sysindexes idx on obj.id = idx.id
-          WHERE idx.status & 0x12 > 0 AND
-                obj.name = #{quote table}
+          SELECT cname
+          FROM sys.syscolumns
+          WHERE tname = '#{table}'
+          AND in_primary_key = 'Y'
         sql
 
         select_value sql, "PK for #{table}"
@@ -510,23 +510,9 @@ module ActiveRecord
         end
       end
 
-      # Resolve all user-defined types (udt) to their fundamental types.
-      # We do not use sp_help as it uses temporary tables that cannot be
-      # used in transactions, that could be started e.g. when migrations
-      # are run.
-      #
       def resolve_type(type)
-        (@udts ||= {})[type] ||= begin
-          sql = <<-sql
-            SELECT st.name AS storage_type
-            FROM systypes s, systypes st
-            WHERE s.type = st.type
-              AND st.name NOT IN ('longsysname', 'nchar', 'nvarchar', 'sysname', 'timestamp')
-              AND s.name = '#{type}'
-          sql
-
-          select_one(sql, "Field type for #{type}")['storage_type'].strip
-        end
+        # effectively a no-op! This probably isn't ok...
+        type
       end
 
       def normalize_type(field_type, prec, scale, length)
