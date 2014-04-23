@@ -303,7 +303,7 @@ module ActiveRecord
         result = select sql, "Columns for #{table_name}"
 
         result.map do | row |
-          name = row['name']
+          name = row['name'].strip
           type = row['type']
           prec = row['prec']
           scale = row['scale']
