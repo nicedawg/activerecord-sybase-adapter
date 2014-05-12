@@ -285,19 +285,25 @@ module ActiveRecord
       end
 
       def columns(table_name, name = nil)
+
         sql = <<-sql
           SELECT
-            col.cname AS name,
-            col.coltype AS type,
-            0 as prec,
-            0 as scale,
-            col.length as length,
+            systabcol.column_name AS name,
+            syscolumns.coltype AS type,
+            systabcol.width as prec,
+            systabcol.scale,
+            syscolumns.length,
             1 as status,
             1 as sysstat2,
-            remarks as def
-          FROM sys.syscolumns col
-          WHERE col.tname = '#{table_name}'
-          ORDER BY col.colno
+            syscolumns.remarks as text
+          FROM
+            sys.systable
+            JOIN sys.systabcol ON systabcol.table_id = systable.table_id
+            JOIN sys.syscolumns ON syscolumns.tname = systable.table_name AND syscolumns.cname = systabcol.column_name
+          WHERE
+            systable.table_name = '#{table_name}'
+            AND systabcol.table_id = systable.table_id
+          ORDER BY syscolumns.colno
         sql
 
         result = select sql, "Columns for #{table_name}"
